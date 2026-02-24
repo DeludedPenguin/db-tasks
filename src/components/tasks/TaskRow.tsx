@@ -1,0 +1,65 @@
+import { format } from "date-fns";
+import { Checkbox } from "@/components/ui/checkbox";
+import PriorityBadge from "./PriorityBadge";
+import { cn } from "@/lib/utils";
+
+interface TaskRowProps {
+  task: any;
+  selected: boolean;
+  onSelect: (id: string, checked: boolean) => void;
+  onToggleComplete: (id: string, completed: boolean) => void;
+  onEdit: (task: any) => void;
+}
+
+export default function TaskRow({ task, selected, onSelect, onToggleComplete, onEdit }: TaskRowProps) {
+  const project = task.projects as { name: string; color: string } | null;
+
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/50",
+        selected && "ring-1 ring-primary/40"
+      )}
+    >
+      <Checkbox
+        checked={selected}
+        onCheckedChange={(v) => onSelect(task.id, !!v)}
+        className="shrink-0"
+      />
+      <Checkbox
+        checked={task.completed}
+        onCheckedChange={() => onToggleComplete(task.id, !task.completed)}
+        className="shrink-0 rounded-full"
+      />
+      <button
+        className="flex flex-1 items-center gap-3 text-left min-w-0"
+        onClick={() => onEdit(task)}
+      >
+        <span className={cn("truncate font-medium", task.completed && "line-through text-muted-foreground")}>
+          {task.name}
+        </span>
+        {project && (
+          <span
+            className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+            style={{
+              backgroundColor: `${project.color}22`,
+              color: project.color,
+            }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: project.color }} />
+            {project.name}
+          </span>
+        )}
+        <PriorityBadge priority={task.priority} />
+      </button>
+      <div className="hidden shrink-0 items-center gap-4 text-xs text-muted-foreground sm:flex">
+        {task.do_date && (
+          <span title="Do date">📅 {format(new Date(task.do_date), "MMM d")}</span>
+        )}
+        {task.due_date && (
+          <span title="Due date">⏰ {format(new Date(task.due_date), "MMM d")}</span>
+        )}
+      </div>
+    </div>
+  );
+}
