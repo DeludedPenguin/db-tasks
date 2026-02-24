@@ -9,24 +9,28 @@ import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { useUpdateTask } from "@/hooks/useTasks";
+import { useUpdateTask, useSetTaskTags } from "@/hooks/useTasks";
 import type { Task, Project } from "@/hooks/useTasks";
+import TagSelector from "@/components/tags/TagSelector";
 import { toast } from "sonner";
 
 interface Props {
   task: Task | null;
   projects: Project[];
+  initialTagIds?: string[];
   onClose: () => void;
 }
 
-export default function EditTaskDialog({ task, projects, onClose }: Props) {
+export default function EditTaskDialog({ task, projects, initialTagIds = [], onClose }: Props) {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [priority, setPriority] = useState("0");
   const [projectId, setProjectId] = useState("");
   const [doDate, setDoDate] = useState<Date>();
   const [dueDate, setDueDate] = useState<Date>();
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const updateTask = useUpdateTask();
+  const setTaskTags = useSetTaskTags();
 
   useEffect(() => {
     if (task) {
@@ -36,8 +40,9 @@ export default function EditTaskDialog({ task, projects, onClose }: Props) {
       setProjectId(task.project_id ?? "");
       setDoDate(task.do_date ? new Date(task.do_date) : undefined);
       setDueDate(task.due_date ? new Date(task.due_date) : undefined);
+      setTagIds(initialTagIds);
     }
-  }, [task]);
+  }, [task, initialTagIds]);
 
   const handleSave = () => {
     if (!task || !name.trim()) return;
@@ -52,7 +57,11 @@ export default function EditTaskDialog({ task, projects, onClose }: Props) {
         due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : null,
       },
       {
-        onSuccess: () => { toast.success("Task updated"); onClose(); },
+        onSuccess: () => {
+          setTaskTags.mutate({ taskId: task.id, tagIds });
+          toast.success("Task updated");
+          onClose();
+        },
         onError: () => toast.error("Failed to update task"),
       }
     );
@@ -97,6 +106,12 @@ export default function EditTaskDialog({ task, projects, onClose }: Props) {
                   <SelectItem value="3">High</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          <div>
+            <Label>Tags</Label>
+            <div className="mt-1">
+              <TagSelector selectedTagIds={tagIds} onChange={setTagIds} />
             </div>
           </div>
           <div className="flex gap-3">

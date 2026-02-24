@@ -6,8 +6,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { Plus, CalendarIcon } from "lucide-react";
-import { useCreateTask } from "@/hooks/useTasks";
+import { useCreateTask, useSetTaskTags } from "@/hooks/useTasks";
 import type { Project } from "@/hooks/useTasks";
+import TagSelector from "@/components/tags/TagSelector";
 import { toast } from "sonner";
 
 export default function AddTaskForm({ projects }: { projects: Project[] }) {
@@ -16,7 +17,9 @@ export default function AddTaskForm({ projects }: { projects: Project[] }) {
   const [projectId, setProjectId] = useState<string>("");
   const [doDate, setDoDate] = useState<Date>();
   const [dueDate, setDueDate] = useState<Date>();
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const createTask = useCreateTask();
+  const setTaskTags = useSetTaskTags();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,12 +33,16 @@ export default function AddTaskForm({ projects }: { projects: Project[] }) {
         due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : null,
       },
       {
-        onSuccess: () => {
+        onSuccess: (task) => {
+          if (tagIds.length > 0) {
+            setTaskTags.mutate({ taskId: task.id, tagIds });
+          }
           setName("");
           setPriority("0");
           setProjectId("");
           setDoDate(undefined);
           setDueDate(undefined);
+          setTagIds([]);
           toast.success("Task created");
         },
         onError: () => toast.error("Failed to create task"),
@@ -80,6 +87,7 @@ export default function AddTaskForm({ projects }: { projects: Project[] }) {
           <SelectItem value="3">High</SelectItem>
         </SelectContent>
       </Select>
+      <TagSelector selectedTagIds={tagIds} onChange={setTagIds} />
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1 text-xs">
