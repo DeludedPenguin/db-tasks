@@ -1,17 +1,20 @@
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import PriorityBadge from "./PriorityBadge";
+import TagBadge from "@/components/tags/TagBadge";
 import { cn } from "@/lib/utils";
+import type { Tag } from "@/hooks/useTasks";
 
 interface TaskRowProps {
   task: any;
   selected: boolean;
+  tags?: Tag[];
   onSelect: (id: string, checked: boolean) => void;
   onToggleComplete: (id: string, completed: boolean) => void;
   onEdit: (task: any) => void;
 }
 
-export default function TaskRow({ task, selected, onSelect, onToggleComplete, onEdit }: TaskRowProps) {
+export default function TaskRow({ task, selected, tags = [], onSelect, onToggleComplete, onEdit }: TaskRowProps) {
   const project = task.projects as { name: string; color: string } | null;
 
   return (
@@ -32,7 +35,7 @@ export default function TaskRow({ task, selected, onSelect, onToggleComplete, on
         className="shrink-0 rounded-full"
       />
       <button
-        className="flex flex-1 items-center gap-3 text-left min-w-0"
+        className="flex flex-1 items-center gap-2 text-left min-w-0 flex-wrap"
         onClick={() => onEdit(task)}
       >
         <span className={cn("truncate font-medium", task.completed && "line-through text-muted-foreground")}>
@@ -51,6 +54,9 @@ export default function TaskRow({ task, selected, onSelect, onToggleComplete, on
           </span>
         )}
         <PriorityBadge priority={task.priority} />
+        {tags.map((tag) => (
+          <TagBadge key={tag.id} tag={tag} />
+        ))}
       </button>
       <div className="hidden shrink-0 items-center gap-4 text-xs text-muted-foreground sm:flex">
         {task.do_date && (
