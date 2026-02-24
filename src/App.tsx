@@ -11,6 +11,7 @@ import Completed from "@/pages/Completed";
 import Projects from "@/pages/Projects";
 import TimerPage from "@/pages/TimerPage";
 import FocusLog from "@/pages/FocusLog";
+import ImportExport from "@/pages/ImportExport";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/projects" element={<Projects />} />
             <Route path="/timer" element={<TimerPage />} />
             <Route path="/timer/log" element={<FocusLog />} />
+            <Route path="/import-export" element={<ImportExport />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

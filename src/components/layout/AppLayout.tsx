@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { CheckSquare, Archive, FolderOpen, Timer, ScrollText, LogOut } from "lucide-react";
+import { CheckSquare, Archive, FolderOpen, Timer, ScrollText, ArrowUpDown, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/projects", label: "Projects", icon: FolderOpen },
   { to: "/timer", label: "Timer", icon: Timer },
   { to: "/timer/log", label: "Focus Log", icon: ScrollText },
+  { to: "/import-export", label: "Import/Export", icon: ArrowUpDown },
 ];
 
 export default function AppLayout() {
