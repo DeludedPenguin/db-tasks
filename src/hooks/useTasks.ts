@@ -87,3 +87,75 @@ export function useDeleteTasks() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
   });
 }
+
+export function useCreateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (project: { name: string; color: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data, error } = await supabase
+        .from("projects")
+        .insert({ ...project, user_id: user.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; name?: string; color?: string }) => {
+      const { data, error } = await supabase
+        .from("projects")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("projects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
+export function useProjectTaskCounts() {
+  return useQuery({
+    queryKey: ["project-task-counts"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("project_id, completed")
+        .eq("user_id", user.id);
+      if (error) throw error;
+      const counts: Record<string, { active: number; completed: number }> = {};
+      for (const t of data) {
+        const pid = t.project_id ?? "__none__";
+        if (!counts[pid]) counts[pid] = { active: 0, completed: 0 };
+        if (t.completed) counts[pid].completed++;
+        else counts[pid].active++;
+      }
+      return counts;
+    },
+  });
+}
