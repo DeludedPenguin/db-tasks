@@ -62,13 +62,6 @@ export default function Auth() {
               {loading ? "Loading…" : isLogin ? "Sign In" : "Sign Up"}
             </Button>
           </form>
-          <button
-            type="button"
-            className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => setIsLogin(!isLogin)}
-          >
-            {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-          </button>
         </CardContent>
       </Card>
     </div>
