@@ -8,8 +8,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-import { useUpdateTask, useSetTaskTags } from "@/hooks/useTasks";
+import { CalendarIcon, Trash2 } from "lucide-react";
+import { useUpdateTask, useDeleteTasks, useSetTaskTags } from "@/hooks/useTasks";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { Task, Project } from "@/hooks/useTasks";
 import TagSelector from "@/components/tags/TagSelector";
 import { toast } from "sonner";
@@ -30,6 +34,7 @@ export default function EditTaskDialog({ task, projects, initialTagIds = [], onC
   const [dueDate, setDueDate] = useState<Date>();
   const [tagIds, setTagIds] = useState<string[]>([]);
   const updateTask = useUpdateTask();
+  const deleteTasks = useDeleteTasks();
   const setTaskTags = useSetTaskTags();
 
   useEffect(() => {
@@ -140,9 +145,38 @@ export default function EditTaskDialog({ task, projects, initialTagIds = [], onC
               </Popover>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!name.trim() || updateTask.isPending}>Save</Button>
+          <div className="flex justify-between gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="icon" title="Delete task">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete task?</AlertDialogTitle>
+                  <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (!task) return;
+                      deleteTasks.mutate([task.id], {
+                        onSuccess: () => { toast.success("Task deleted"); onClose(); },
+                        onError: () => toast.error("Failed to delete task"),
+                      });
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button onClick={handleSave} disabled={!name.trim() || updateTask.isPending}>Save</Button>
+            </div>
           </div>
         </div>
       </DialogContent>
