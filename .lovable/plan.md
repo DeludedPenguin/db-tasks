@@ -1,90 +1,74 @@
-# DB_Tasks — Implementation Plan
 
-## Overview
 
-A personal productivity app for academic/creative workflows with integrated focus tracking, built on Supabase with a calm blue homelab aesthetic.
+## Plan: Three Improvements
 
-The app is named '**DB_Tasks**'
+### 1. Fix Focus Timer Drift
 
----
+**Problem:** The timer uses `setInterval` with a 1-second tick, but browsers throttle intervals in background tabs (sometimes to once per minute). After 15 real minutes in the background, only a few ticks may have fired.
 
-## Phase 1: Foundation & Data
+**Fix:** Instead of decrementing a counter each tick, store the real start timestamp and calculate remaining time from `Date.now()` on each tick. This way, even if ticks are throttled, when the tab regains focus the timer immediately shows the correct time.
 
-### Supabase Setup
+**Changes to `src/pages/TimerPage.tsx`:**
+- Store a `targetEndTime` ref (set when starting: `Date.now() + remaining * 1000`)
+- On each interval tick, calculate `remaining = Math.max(0, Math.ceil((targetEndTime - Date.now()) / 1000))`
+- Add a `visibilitychange` listener to immediately recalculate when the tab becomes visible again
+- On pause, store the current remaining and clear targetEndTime; on resume, set a new targetEndTime from the stored remaining
 
-- **Auth**: Email/password login (single user, for security/admin control)
-- **Database tables**: `projects` (id, name, color, created_at), `tasks` (id, name, completed, do_date, due_date, priority 0-3, project_id, notes, created_at, completed_at), `focus_sessions` (id, start_time, end_time, planned_minutes, actual_minutes, notes, task_id, date)
-- **RLS policies**: All data scoped to the logged-in user
+### 2. Date Filters on the Task List
 
-### Theme & Layout
+Add a date filter control next to the existing tag filter and sort controls on the main Tasks page. Options:
 
-- Dark blue-grey background (`#2c3e50`, `#34495e`) with calm card-based design
-- Top navigation bar: **Tasks** | **Completed** | **Projects** | **Timer** | **Focus Log**
-- Responsive grid layouts for all screen sizes
+- **All** (default, current behaviour)
+- **Due today** -- tasks with `due_date` equal to today
+- **Overdue + today** -- tasks with `due_date` on or before today
+- **Upcoming** -- tasks with `due_date` after today
 
----
+**Changes:**
+- Create `src/components/tasks/DateFilter.tsx` -- a small button group or dropdown (similar style to `SortControls`)
+- Update `src/pages/Index.tsx` to add a `dateFilter` state and apply it in the filtering `useMemo`, comparing against today's date using `date-fns`
 
-## Phase 2: Task Management
+### 3. Import from App's Own Export Format
 
-### Main Dashboard (`/`)
+Currently the Import page only supports Super Productivity CSVs. We'll add a second importer that recognises the app's own export format (active tasks, completed tasks, and focus log CSVs).
 
-- List of active (incomplete) tasks showing project tag (color-coded), priority badge (green/yellow/red), do date, and due date
-- Inline "new task" form with project dropdown, priority selector, do date & due date pickers
-- Sort controls: by priority, project, do date, due date
-- Multi-select checkboxes for bulk actions (complete, delete, change project/priority)
-- Click task to edit in a slide-out panel or modal
+**Detection logic:** Check CSV headers to auto-detect format:
+- If headers match `name,priority,project,do_date,due_date,notes,created_at` -- active tasks export
+- If headers match `name,priority,project,completed_at,notes,created_at` -- completed tasks export
+- If headers match `date,planned_minutes,actual_minutes,task,notes,start_time,end_time` -- focus log export
+- If headers include `title` and `project_title` -- Super Productivity format (existing)
 
-### Completed Tasks (`/completed`)
+**Changes to `src/lib/csv.ts`:**
+- Add a `detectCSVFormat()` function that inspects headers
+- Add `mapNativeTaskCSV()` and `mapNativeFocusLogCSV()` mapping functions
 
-- Archive view of completed tasks with completion dates
-- Ability to uncomplete (restore), edit, or permanently delete
+**Changes to `src/pages/ImportExport.tsx`:**
+- Replace the "Import from Super Productivity" heading with a generic "Import" section
+- On file upload, auto-detect the format and show the appropriate preview
+- For task imports (active or completed), reuse the existing project-matching and task insertion logic
+- For focus log imports, insert into `focus_sessions` with the same project/task matching where possible
+- Show the detected format in the preview ("Detected: Active Tasks Export", etc.)
 
----
+### Technical Details
 
-## Phase 3: Projects
+**Timer fix (core logic):**
+```text
+targetEndRef = useRef<number>(0)
 
-### Projects Page (`/projects`)
+handleStart:
+  targetEndRef.current = Date.now() + remaining * 1000
 
-- List all projects with their color swatch and task count
-- Create new project with name + color picker
-- Click a project to filter/view its tasks
-- Edit or delete projects
+interval tick:
+  remaining = Math.ceil((targetEndRef - Date.now()) / 1000)
+  if remaining <= 0 -> done
 
----
+visibilitychange listener:
+  if document becomes visible and state === running -> recalculate immediately
+```
 
-## Phase 4: Focus Timer
+**Date filter options:**
+```text
+"all" | "today" | "overdue" | "upcoming"
+```
 
-### Timer Page (`/timer`)
+Filtering uses `date-fns/format` to compare `task.due_date` against today's date string (YYYY-MM-DD).
 
-- Session length buttons: 10 / 25 / 30 minutes
-- Live countdown display with color progression (green → yellow → red)
-- Optional task linking dropdown (associate session with a task)
-- On completion: notes form appears, session saved to database
-- If linked to a task, time is added to that task's record
-
-### Focus Log (`/timer/log`)
-
-- Chronological history of all focus sessions
-- Shows date, duration, linked task (if any), and notes
-
----
-
-## Phase 5: Import & Export
-
-### One-off CSV Import
-
-- Import page/modal to upload the attached Super Productivity CSV
-- Auto-create projects from `project_title` column with auto-assigned colors
-- Map fields: `title` → name, `due_day` → due date, `planned_at` → do date, `is_done` → completed, `time_estimate_ms` → stored as minutes, `notes` → notes
-- Show preview before confirming import
-
-### CSV Export
-
-- Export buttons for: active tasks, completed tasks, and focus log
-- Downloads as clean CSV files
-
----
-
-## Data from CSV Import
-
-The attached CSV contains ~49 tasks across ~15 projects (work_research, personal, home_stuff, work_engagement, health, workplanning, etc.). These will be imported with their projects auto-created and color-coded.
