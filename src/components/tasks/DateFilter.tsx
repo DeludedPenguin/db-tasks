@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { CalendarDays } from "lucide-react";
 
-export type DateFilterKey = "all" | "today" | "overdue" | "upcoming";
+export type DateFilterKey = "all" | "today" | "do_or_due_today" | "overdue" | "upcoming" | "no_due";
 
 interface Props {
   value: DateFilterKey;
@@ -10,9 +10,10 @@ interface Props {
 
 const options: { key: DateFilterKey; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "today", label: "Today" },
+  { key: "do_or_due_today", label: "Today" },
   { key: "overdue", label: "Overdue" },
   { key: "upcoming", label: "Upcoming" },
+  { key: "no_due", label: "No Due Date" },
 ];
 
 export default function DateFilter({ value, onChange }: Props) {
