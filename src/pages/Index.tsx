@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 import { useTasks, useProjects, useUpdateTask, useTaskTags } from "@/hooks/useTasks";
 import AddTaskForm from "@/components/tasks/AddTaskForm";
 import TaskRow from "@/components/tasks/TaskRow";
@@ -97,6 +98,10 @@ export default function Index() {
     return (taskTagsMap[editTask.id] ?? []).map((t: any) => t.id);
   }, [editTask, taskTagsMap]);
 
+  const selectAll = () => {
+    setSelected(new Set(sorted.map((t) => t.id)));
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -110,12 +115,19 @@ export default function Index() {
 
       <AddTaskForm projects={projects} />
 
-      <BulkActions
-        selectedIds={Array.from(selected)}
-        onClear={() => setSelected(new Set())}
-        projects={projects}
-        mode="active"
-      />
+      <div className="flex items-center gap-2">
+        {sorted.length > 0 && selected.size < sorted.length && (
+          <Button variant="outline" size="sm" onClick={selectAll} className="text-xs">
+            Select all{sorted.length !== tasks.length ? ` (${sorted.length} filtered)` : ` (${sorted.length})`}
+          </Button>
+        )}
+        <BulkActions
+          selectedIds={Array.from(selected)}
+          onClear={() => setSelected(new Set())}
+          projects={projects}
+          mode="active"
+        />
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
