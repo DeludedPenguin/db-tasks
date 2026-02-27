@@ -45,9 +45,12 @@ export default function Index() {
       // Date filter
       if (dateFilter !== "all") {
         const due = task.due_date;
+        const doDate = task.do_date;
         if (dateFilter === "today") return due === today;
+        if (dateFilter === "do_or_due_today") return due === today || doDate === today;
         if (dateFilter === "overdue") return !!due && due <= today;
         if (dateFilter === "upcoming") return !!due && due > today;
+        if (dateFilter === "no_due") return !due;
       }
       return true;
     });

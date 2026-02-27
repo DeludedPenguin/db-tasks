@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, isBefore, startOfDay } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import PriorityBadge from "./PriorityBadge";
 import TagBadge from "@/components/tags/TagBadge";
@@ -16,6 +16,7 @@ interface TaskRowProps {
 
 export default function TaskRow({ task, selected, tags = [], onSelect, onToggleComplete, onEdit }: TaskRowProps) {
   const project = task.projects as { name: string; color: string } | null;
+  const isOverdue = !task.completed && task.due_date && isBefore(new Date(task.due_date), startOfDay(new Date()));
 
   return (
     <div
@@ -58,7 +59,12 @@ export default function TaskRow({ task, selected, tags = [], onSelect, onToggleC
           <TagBadge key={tag.id} tag={tag} />
         ))}
       </button>
-      <div className="hidden shrink-0 items-center gap-4 text-xs text-muted-foreground sm:flex">
+      <div className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
+        {isOverdue && (
+          <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+            overdue
+          </span>
+        )}
         {task.do_date && (
           <span title="Do date">📅 {format(new Date(task.do_date), "MMM d")}</span>
         )}
