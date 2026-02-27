@@ -6,6 +6,8 @@ import EditTaskDialog from "@/components/tasks/EditTaskDialog";
 import BulkActions from "@/components/tasks/BulkActions";
 import SortControls, { type SortKey } from "@/components/tasks/SortControls";
 import TagFilter from "@/components/tags/TagFilter";
+import DateFilter, { type DateFilterKey } from "@/components/tasks/DateFilter";
+import { format } from "date-fns";
 import type { Task } from "@/hooks/useTasks";
 
 export default function Index() {
@@ -16,6 +18,7 @@ export default function Index() {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
+  const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
 
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
   const { data: taskTagsData = [] } = useTaskTags(taskIds);
@@ -30,14 +33,25 @@ export default function Index() {
     return map;
   }, [taskTagsData]);
 
-  // Filter by tags
+  // Filter by tags and date
   const filtered = useMemo(() => {
-    if (filterTagIds.length === 0) return tasks;
+    const today = format(new Date(), "yyyy-MM-dd");
     return tasks.filter((task) => {
-      const tags = taskTagsMap[task.id] ?? [];
-      return filterTagIds.some((fid) => tags.some((t: any) => t.id === fid));
+      // Tag filter
+      if (filterTagIds.length > 0) {
+        const tags = taskTagsMap[task.id] ?? [];
+        if (!filterTagIds.some((fid) => tags.some((t: any) => t.id === fid))) return false;
+      }
+      // Date filter
+      if (dateFilter !== "all") {
+        const due = task.due_date;
+        if (dateFilter === "today") return due === today;
+        if (dateFilter === "overdue") return !!due && due <= today;
+        if (dateFilter === "upcoming") return !!due && due > today;
+      }
+      return true;
     });
-  }, [tasks, filterTagIds, taskTagsMap]);
+  }, [tasks, filterTagIds, taskTagsMap, dateFilter]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -85,6 +99,7 @@ export default function Index() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
         <div className="flex items-center gap-2">
+          <DateFilter value={dateFilter} onChange={setDateFilter} />
           <TagFilter selectedTagIds={filterTagIds} onChange={setFilterTagIds} />
           <SortControls sortKey={sortKey} onSort={setSortKey} />
         </div>

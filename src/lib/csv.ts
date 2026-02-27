@@ -68,6 +68,93 @@ export function downloadCSV(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// CSV format detection
+export type CSVFormat = "super_productivity" | "active_tasks" | "completed_tasks" | "focus_log" | "unknown";
+
+export function detectCSVFormat(headers: string[]): CSVFormat {
+  const h = new Set(headers.map((s) => s.trim().toLowerCase()));
+  if (h.has("title") && h.has("project_title")) return "super_productivity";
+  if (h.has("name") && h.has("do_date") && h.has("due_date")) return "active_tasks";
+  if (h.has("name") && h.has("completed_at") && !h.has("due_date")) return "completed_tasks";
+  if (h.has("planned_minutes") && h.has("actual_minutes") && h.has("start_time")) return "focus_log";
+  return "unknown";
+}
+
+export function detectCSVFormatFromText(text: string): { format: CSVFormat; rows: Record<string, string>[] } {
+  const rows = parseCSV(text);
+  if (rows.length === 0) return { format: "unknown", rows };
+  const headers = Object.keys(rows[0]);
+  return { format: detectCSVFormat(headers), rows };
+}
+
+export interface NativeImportedTask {
+  name: string;
+  priority: number;
+  projectName: string;
+  doDate: string | null;
+  dueDate: string | null;
+  completedAt: string | null;
+  completed: boolean;
+  notes: string | null;
+  createdAt: string | null;
+}
+
+export function mapNativeTaskCSV(rows: Record<string, string>[], completed: boolean): {
+  tasks: NativeImportedTask[];
+  projects: { name: string; color: string }[];
+} {
+  const projectSet = new Map<string, string>();
+  let colorIdx = 0;
+
+  const tasks: NativeImportedTask[] = rows
+    .filter((r) => r.name?.trim())
+    .map((r) => {
+      const projectName = r.project?.trim() ?? "";
+      if (projectName && !projectSet.has(projectName)) {
+        projectSet.set(projectName, PROJECT_COLORS[colorIdx % PROJECT_COLORS.length]);
+        colorIdx++;
+      }
+      return {
+        name: r.name.trim(),
+        priority: parseInt(r.priority ?? "0", 10) || 0,
+        projectName,
+        doDate: r.do_date?.trim() || null,
+        dueDate: r.due_date?.trim() || null,
+        completedAt: completed ? (r.completed_at?.trim() || null) : null,
+        completed,
+        notes: r.notes?.trim() || null,
+        createdAt: r.created_at?.trim() || null,
+      };
+    });
+
+  const projects = Array.from(projectSet.entries()).map(([name, color]) => ({ name, color }));
+  return { tasks, projects };
+}
+
+export interface NativeImportedSession {
+  date: string;
+  plannedMinutes: number;
+  actualMinutes: number | null;
+  taskName: string;
+  notes: string | null;
+  startTime: string;
+  endTime: string | null;
+}
+
+export function mapNativeFocusLogCSV(rows: Record<string, string>[]): NativeImportedSession[] {
+  return rows
+    .filter((r) => r.planned_minutes?.trim())
+    .map((r) => ({
+      date: r.date?.trim() ?? "",
+      plannedMinutes: parseInt(r.planned_minutes?.trim() ?? "0", 10) || 0,
+      actualMinutes: r.actual_minutes?.trim() ? parseInt(r.actual_minutes.trim(), 10) : null,
+      taskName: r.task?.trim() ?? "",
+      notes: r.notes?.trim() || null,
+      startTime: r.start_time?.trim() ?? new Date().toISOString(),
+      endTime: r.end_time?.trim() || null,
+    }));
+}
+
 // Super Productivity CSV field mapping
 const PROJECT_COLORS = [
   "#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6",

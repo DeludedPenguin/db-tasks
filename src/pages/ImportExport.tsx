@@ -2,15 +2,40 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, Download, FileText, CheckCircle2, AlertCircle } from "lucide-react";
-import { parseCSV, mapSuperProductivityCSV, toCSV, downloadCSV, type ImportedTask } from "@/lib/csv";
+import {
+  parseCSV,
+  mapSuperProductivityCSV,
+  toCSV,
+  downloadCSV,
+  detectCSVFormatFromText,
+  mapNativeTaskCSV,
+  mapNativeFocusLogCSV,
+  type ImportedTask,
+  type NativeImportedTask,
+  type NativeImportedSession,
+  type CSVFormat,
+} from "@/lib/csv";
 import { supabase } from "@/integrations/supabase/client";
 import { useTasks, useProjects } from "@/hooks/useTasks";
 import { useFocusSessions } from "@/hooks/useFocusSessions";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+type PreviewData =
+  | { type: "super_productivity"; tasks: ImportedTask[]; projects: { name: string; color: string }[] }
+  | { type: "active_tasks" | "completed_tasks"; tasks: NativeImportedTask[]; projects: { name: string; color: string }[] }
+  | { type: "focus_log"; sessions: NativeImportedSession[] };
+
+const FORMAT_LABELS: Record<CSVFormat, string> = {
+  super_productivity: "Super Productivity Export",
+  active_tasks: "Active Tasks Export",
+  completed_tasks: "Completed Tasks Export",
+  focus_log: "Focus Log Export",
+  unknown: "Unknown Format",
+};
+
 export default function ImportExport() {
-  const [preview, setPreview] = useState<{ tasks: ImportedTask[]; projects: { name: string; color: string }[] } | null>(null);
+  const [preview, setPreview] = useState<PreviewData | null>(null);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -28,11 +53,39 @@ export default function ImportExport() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const rows = parseCSV(text);
-      const result = mapSuperProductivityCSV(rows);
-      setPreview(result);
+      const { format, rows } = detectCSVFormatFromText(text);
+
+      if (format === "super_productivity") {
+        const result = mapSuperProductivityCSV(rows);
+        setPreview({ type: "super_productivity", ...result });
+      } else if (format === "active_tasks") {
+        const result = mapNativeTaskCSV(rows, false);
+        setPreview({ type: "active_tasks", ...result });
+      } else if (format === "completed_tasks") {
+        const result = mapNativeTaskCSV(rows, true);
+        setPreview({ type: "completed_tasks", ...result });
+      } else if (format === "focus_log") {
+        const sessions = mapNativeFocusLogCSV(rows);
+        setPreview({ type: "focus_log", sessions });
+      } else {
+        toast.error("Unrecognised CSV format. Please use a file exported from this app or Super Productivity.");
+        setPreview(null);
+      }
     };
     reader.readAsText(file);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  const ensureProjects = async (userId: string, projectNames: { name: string; color: string }[]) => {
+    const { data: existing } = await supabase.from("projects").select("name").eq("user_id", userId);
+    const existingNames = new Set((existing ?? []).map((p) => p.name));
+    const newProjects = projectNames.filter((p) => p.name && !existingNames.has(p.name));
+    if (newProjects.length > 0) {
+      await supabase.from("projects").insert(newProjects.map((p) => ({ ...p, user_id: userId })));
+    }
+    const { data: all } = await supabase.from("projects").select("id, name").eq("user_id", userId);
+    return new Map((all ?? []).map((p) => [p.name, p.id]));
   };
 
   const handleImport = async () => {
@@ -42,42 +95,65 @@ export default function ImportExport() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // 1. Create projects (skip existing)
-      const { data: existingProjects } = await supabase.from("projects").select("name").eq("user_id", user.id);
-      const existingNames = new Set((existingProjects ?? []).map((p) => p.name));
-      const newProjects = preview.projects.filter((p) => !existingNames.has(p.name));
+      if (preview.type === "super_productivity") {
+        const projectMap = await ensureProjects(user.id, preview.projects);
+        const taskRows = preview.tasks.map((t) => ({
+          user_id: user.id,
+          name: t.name,
+          project_id: t.projectTitle ? projectMap.get(t.projectTitle) ?? null : null,
+          due_date: t.dueDate,
+          do_date: t.doDate,
+          completed: t.completed,
+          completed_at: t.completed ? new Date().toISOString() : null,
+          notes: t.notes,
+          priority: t.priority,
+        }));
+        const { error } = await supabase.from("tasks").insert(taskRows);
+        if (error) throw error;
+        toast.success(`Imported ${taskRows.length} tasks`);
+      } else if (preview.type === "active_tasks" || preview.type === "completed_tasks") {
+        const projectMap = await ensureProjects(user.id, preview.projects);
+        const taskRows = preview.tasks.map((t) => ({
+          user_id: user.id,
+          name: t.name,
+          project_id: t.projectName ? projectMap.get(t.projectName) ?? null : null,
+          due_date: t.dueDate,
+          do_date: t.doDate,
+          completed: t.completed,
+          completed_at: t.completedAt,
+          notes: t.notes,
+          priority: t.priority,
+        }));
+        const { error } = await supabase.from("tasks").insert(taskRows);
+        if (error) throw error;
+        toast.success(`Imported ${taskRows.length} ${preview.type === "active_tasks" ? "active" : "completed"} tasks`);
+      } else if (preview.type === "focus_log") {
+        // Try to match task names to existing tasks
+        const { data: allTasks } = await supabase.from("tasks").select("id, name").eq("user_id", user.id);
+        const taskNameMap = new Map((allTasks ?? []).map((t) => [t.name, t.id]));
 
-      if (newProjects.length > 0) {
-        await supabase.from("projects").insert(newProjects.map((p) => ({ ...p, user_id: user.id })));
+        const sessionRows = preview.sessions.map((s) => ({
+          user_id: user.id,
+          date: s.date,
+          planned_minutes: s.plannedMinutes,
+          actual_minutes: s.actualMinutes,
+          start_time: s.startTime,
+          end_time: s.endTime,
+          task_id: s.taskName ? taskNameMap.get(s.taskName) ?? null : null,
+          notes: s.notes,
+        }));
+        const { error } = await supabase.from("focus_sessions").insert(sessionRows);
+        if (error) throw error;
+        toast.success(`Imported ${sessionRows.length} focus sessions`);
       }
-
-      // 2. Get all projects for mapping
-      const { data: allProjects } = await supabase.from("projects").select("id, name").eq("user_id", user.id);
-      const projectMap = new Map((allProjects ?? []).map((p) => [p.name, p.id]));
-
-      // 3. Insert tasks
-      const taskRows = preview.tasks.map((t) => ({
-        user_id: user.id,
-        name: t.name,
-        project_id: t.projectTitle ? projectMap.get(t.projectTitle) ?? null : null,
-        due_date: t.dueDate,
-        do_date: t.doDate,
-        completed: t.completed,
-        completed_at: t.completed ? new Date().toISOString() : null,
-        notes: t.notes,
-        priority: t.priority,
-      }));
-
-      const { error } = await supabase.from("tasks").insert(taskRows);
-      if (error) throw error;
 
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["projects"] });
       qc.invalidateQueries({ queryKey: ["project-task-counts"] });
+      qc.invalidateQueries({ queryKey: ["focus-sessions"] });
 
       setImportDone(true);
       setPreview(null);
-      toast.success(`Imported ${taskRows.length} tasks and ${newProjects.length} new projects`);
     } catch (err: any) {
       toast.error("Import failed: " + err.message);
     } finally {
@@ -126,6 +202,11 @@ export default function ImportExport() {
     toast.success("Focus log exported");
   };
 
+  const formatLabel = preview ? FORMAT_LABELS[preview.type] : "";
+  const previewCount =
+    preview?.type === "focus_log" ? preview.sessions.length :
+    preview ? preview.tasks.length : 0;
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-semibold tracking-tight">Import & Export</h2>
@@ -135,12 +216,12 @@ export default function ImportExport() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Upload className="h-5 w-5 text-primary" />
-            Import from Super Productivity
+            Import
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Upload a CSV exported from Super Productivity. Projects will be auto-created and tasks mapped automatically.
+            Upload a CSV exported from this app or from Super Productivity. The format is auto-detected.
           </p>
           <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />
           <Button variant="outline" onClick={() => fileRef.current?.click()}>
@@ -156,45 +237,85 @@ export default function ImportExport() {
 
           {preview && (
             <div className="space-y-3 rounded-md border border-border p-4">
-              <h3 className="text-sm font-medium">Preview</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Preview</h3>
+                <span className="rounded bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+                  Detected: {formatLabel}
+                </span>
+              </div>
+
               <div className="flex gap-4 text-sm text-muted-foreground">
-                <span>{preview.tasks.length} tasks</span>
-                <span>{preview.projects.length} projects</span>
-                <span>{preview.tasks.filter((t) => t.completed).length} already completed</span>
+                <span>{previewCount} {preview.type === "focus_log" ? "sessions" : "tasks"}</span>
+                {preview.type !== "focus_log" && (
+                  <span>{preview.projects.length} projects</span>
+                )}
+                {preview.type === "super_productivity" && (
+                  <span>{preview.tasks.filter((t) => t.completed).length} already completed</span>
+                )}
               </div>
 
               <div className="max-h-60 overflow-auto rounded border border-border">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-card">
                     <tr className="text-left text-muted-foreground">
-                      <th className="p-2">Name</th>
-                      <th className="p-2">Project</th>
-                      <th className="p-2">Priority</th>
-                      <th className="p-2">Done</th>
+                      {preview.type === "focus_log" ? (
+                        <>
+                          <th className="p-2">Date</th>
+                          <th className="p-2">Planned</th>
+                          <th className="p-2">Actual</th>
+                          <th className="p-2">Task</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="p-2">Name</th>
+                          <th className="p-2">Project</th>
+                          <th className="p-2">Priority</th>
+                          <th className="p-2">{preview.type === "completed_tasks" ? "Completed" : "Done"}</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.tasks.slice(0, 50).map((t, i) => (
-                      <tr key={i} className="border-t border-border">
-                        <td className="p-2 text-foreground">{t.name}</td>
-                        <td className="p-2">{t.projectTitle}</td>
-                        <td className="p-2">{t.priority}</td>
-                        <td className="p-2">{t.completed ? "✓" : ""}</td>
-                      </tr>
-                    ))}
+                    {preview.type === "focus_log"
+                      ? preview.sessions.slice(0, 50).map((s, i) => (
+                          <tr key={i} className="border-t border-border">
+                            <td className="p-2 text-foreground">{s.date}</td>
+                            <td className="p-2">{s.plannedMinutes}m</td>
+                            <td className="p-2">{s.actualMinutes ?? "—"}m</td>
+                            <td className="p-2">{s.taskName || "—"}</td>
+                          </tr>
+                        ))
+                      : (preview.type === "super_productivity"
+                          ? preview.tasks.slice(0, 50).map((t, i) => (
+                              <tr key={i} className="border-t border-border">
+                                <td className="p-2 text-foreground">{t.name}</td>
+                                <td className="p-2">{t.projectTitle}</td>
+                                <td className="p-2">{t.priority}</td>
+                                <td className="p-2">{t.completed ? "✓" : ""}</td>
+                              </tr>
+                            ))
+                          : preview.tasks.slice(0, 50).map((t, i) => (
+                              <tr key={i} className="border-t border-border">
+                                <td className="p-2 text-foreground">{t.name}</td>
+                                <td className="p-2">{t.projectName}</td>
+                                <td className="p-2">{t.priority}</td>
+                                <td className="p-2">{t.completed ? "✓" : ""}</td>
+                              </tr>
+                            ))
+                        )}
                   </tbody>
                 </table>
               </div>
 
-              {preview.tasks.length > 50 && (
+              {previewCount > 50 && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" /> Showing first 50 of {preview.tasks.length} tasks
+                  <AlertCircle className="h-3 w-3" /> Showing first 50 of {previewCount} {preview.type === "focus_log" ? "sessions" : "tasks"}
                 </p>
               )}
 
               <div className="flex gap-2">
                 <Button onClick={handleImport} disabled={importing}>
-                  {importing ? "Importing…" : `Import ${preview.tasks.length} Tasks`}
+                  {importing ? "Importing…" : `Import ${previewCount} ${preview.type === "focus_log" ? "Sessions" : "Tasks"}`}
                 </Button>
                 <Button variant="ghost" onClick={() => setPreview(null)}>
                   Cancel
