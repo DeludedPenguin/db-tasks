@@ -19,6 +19,7 @@ export default function TimerPage() {
   const [taskId, setTaskId] = useState<string>("none");
   const [notes, setNotes] = useState("");
   const startTimeRef = useRef<string | null>(null);
+  const targetEndRef = useRef<number>(0);
 
   const { data: tasks } = useTasks(false);
   const createSession = useCreateFocusSession();
@@ -41,24 +42,45 @@ export default function TimerPage() {
     return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   };
 
+  const recalcRemaining = useCallback(() => {
+    if (targetEndRef.current <= 0) return;
+    const now = Date.now();
+    const diff = Math.max(0, Math.ceil((targetEndRef.current - now) / 1000));
+    if (diff <= 0) {
+      setRemaining(0);
+      setState("done");
+    } else {
+      setRemaining(diff);
+    }
+  }, []);
+
+  // Interval tick — uses wall clock, immune to background throttling
   useEffect(() => {
     if (state !== "running") return;
-    const interval = setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) {
-          setState("done");
-          return 0;
-        }
-        return r - 1;
-      });
-    }, 1000);
+    const interval = setInterval(recalcRemaining, 1000);
     return () => clearInterval(interval);
-  }, [state]);
+  }, [state, recalcRemaining]);
+
+  // Recalculate immediately when tab becomes visible again
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden && state === "running") {
+        recalcRemaining();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [state, recalcRemaining]);
 
   const handleStart = () => {
     if (state === "idle") {
       startTimeRef.current = new Date().toISOString();
-      setRemaining(planned * 60);
+      const secs = planned * 60;
+      setRemaining(secs);
+      targetEndRef.current = Date.now() + secs * 1000;
+    } else if (state === "paused") {
+      // Resume: set new target from current remaining
+      targetEndRef.current = Date.now() + remaining * 1000;
     }
     setState("running");
   };
@@ -70,6 +92,7 @@ export default function TimerPage() {
     setRemaining(planned * 60);
     setNotes("");
     startTimeRef.current = null;
+    targetEndRef.current = 0;
   };
 
   const handleSave = useCallback(async () => {
