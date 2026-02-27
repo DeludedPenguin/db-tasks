@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { CalendarIcon, Trash2 } from "lucide-react";
+import { CalendarIcon, Trash2, X } from "lucide-react";
 import { useUpdateTask, useDeleteTasks, useSetTaskTags } from "@/hooks/useTasks";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -122,27 +122,41 @@ export default function EditTaskDialog({ task, projects, initialTagIds = [], onC
           <div className="flex gap-3">
             <div className="flex-1">
               <Label>Do Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="mt-1 w-full justify-start gap-2 text-sm">
-                    <CalendarIcon className="h-3 w-3" />
-                    {doDate ? format(doDate, "MMM d, yyyy") : "Not set"}
+              <div className="mt-1 flex gap-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start gap-2 text-sm">
+                      <CalendarIcon className="h-3 w-3" />
+                      {doDate ? format(doDate, "MMM d, yyyy") : "Not set"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={doDate} onSelect={setDoDate} className="p-3 pointer-events-auto" /></PopoverContent>
+                </Popover>
+                {doDate && (
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setDoDate(undefined)} title="Clear do date">
+                    <X className="h-3 w-3" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={doDate} onSelect={setDoDate} /></PopoverContent>
-              </Popover>
+                )}
+              </div>
             </div>
             <div className="flex-1">
               <Label>Due Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="mt-1 w-full justify-start gap-2 text-sm">
-                    <CalendarIcon className="h-3 w-3" />
-                    {dueDate ? format(dueDate, "MMM d, yyyy") : "Not set"}
+              <div className="mt-1 flex gap-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start gap-2 text-sm">
+                      <CalendarIcon className="h-3 w-3" />
+                      {dueDate ? format(dueDate, "MMM d, yyyy") : "Not set"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} className="p-3 pointer-events-auto" /></PopoverContent>
+                </Popover>
+                {dueDate && (
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setDueDate(undefined)} title="Clear due date">
+                    <X className="h-3 w-3" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} /></PopoverContent>
-              </Popover>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex justify-between gap-2">

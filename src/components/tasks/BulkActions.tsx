@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, CheckCheck, RotateCcw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Trash2, CheckCheck, RotateCcw, CalendarIcon, X } from "lucide-react";
 import { useUpdateTask, useDeleteTasks } from "@/hooks/useTasks";
 import type { Project } from "@/hooks/useTasks";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Props {
   selectedIds: string[];
@@ -16,6 +21,7 @@ export default function BulkActions({ selectedIds, onClear, projects, mode }: Pr
   const updateTask = useUpdateTask();
   const deleteTasks = useDeleteTasks();
   const count = selectedIds.length;
+  const [dueDateOpen, setDueDateOpen] = useState(false);
 
   const bulkUpdate = (updates: Record<string, any>) => {
     Promise.all(
@@ -55,6 +61,28 @@ export default function BulkActions({ selectedIds, onClear, projects, mode }: Pr
           ))}
         </SelectContent>
       </Select>
+      <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+        <PopoverTrigger asChild>
+          <Button size="sm" variant="secondary">
+            <CalendarIcon className="h-3 w-3 mr-1" /> Due Date
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            onSelect={(date) => {
+              if (date) {
+                bulkUpdate({ due_date: format(date, "yyyy-MM-dd") });
+                setDueDateOpen(false);
+              }
+            }}
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+      <Button size="sm" variant="outline" onClick={() => bulkUpdate({ due_date: null, do_date: null })}>
+        <X className="h-3 w-3 mr-1" /> Clear Dates
+      </Button>
       <Button size="sm" variant="destructive" onClick={() => deleteTasks.mutate(selectedIds, { onSuccess: () => { toast.success(`Deleted ${count} tasks`); onClear(); } })}>
         <Trash2 className="h-3 w-3 mr-1" /> Delete
       </Button>
