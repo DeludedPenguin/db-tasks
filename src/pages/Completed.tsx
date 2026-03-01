@@ -3,6 +3,7 @@ import { useTasks, useProjects, useUpdateTask } from "@/hooks/useTasks";
 import TaskRow from "@/components/tasks/TaskRow";
 import EditTaskDialog from "@/components/tasks/EditTaskDialog";
 import BulkActions from "@/components/tasks/BulkActions";
+import CompletionChart from "@/components/tasks/CompletionChart";
 import type { Task } from "@/hooks/useTasks";
 
 export default function Completed() {
@@ -31,6 +32,8 @@ export default function Completed() {
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-semibold tracking-tight">Completed Tasks</h2>
+
+      <CompletionChart tasks={tasks} />
 
       <BulkActions
         selectedIds={Array.from(selected)}

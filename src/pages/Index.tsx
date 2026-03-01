@@ -9,10 +9,12 @@ import SortControls, { type SortKey } from "@/components/tasks/SortControls";
 import TagFilter from "@/components/tags/TagFilter";
 import DateFilter, { type DateFilterKey } from "@/components/tasks/DateFilter";
 import { format } from "date-fns";
+import { CheckCircle2 } from "lucide-react";
 import type { Task } from "@/hooks/useTasks";
 
 export default function Index() {
   const { data: tasks = [], isLoading } = useTasks(false);
+  const { data: completedTasks = [] } = useTasks(true);
   const { data: projects = [] } = useProjects();
   const updateTask = useUpdateTask();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -20,6 +22,13 @@ export default function Index() {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
+
+  const completedToday = useMemo(() => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    return completedTasks.filter(
+      (t) => t.completed_at && t.completed_at.startsWith(today)
+    ).length;
+  }, [completedTasks]);
 
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
   const { data: taskTagsData = [] } = useTaskTags(taskIds);
@@ -105,7 +114,15 @@ export default function Index() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
+          {completedToday > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary">
+              <CheckCircle2 className="h-3 w-3" />
+              {completedToday} done today
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <DateFilter value={dateFilter} onChange={setDateFilter} />
           <TagFilter selectedTagIds={filterTagIds} onChange={setFilterTagIds} />
