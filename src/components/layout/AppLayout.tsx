@@ -22,14 +22,14 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="container flex h-14 items-center justify-between">
-          <div className="flex items-center gap-1">
-            <h1 className="mr-4 text-lg font-semibold tracking-tight text-foreground">
+    <div className="min-h-screen bg-background text-sm">
+      <header className="sticky top-0 z-50 border-b border-line/70 bg-background/80 backdrop-blur-xl">
+        <div className="container flex min-h-14 items-center justify-between gap-2 py-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <h1 className="mr-3 shrink-0 font-mono text-[13px] font-semibold text-foreground sm:text-[15px]">
               DB_Tasks
             </h1>
-            <nav className="flex items-center gap-1">
+            <nav className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-xl border border-line bg-panel/50 p-1 backdrop-blur-md">
               {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -37,10 +37,10 @@ export default function AppLayout() {
                   end={to === "/"}
                   className={({ isActive }) =>
                     cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 font-mono text-[10px] font-medium transition sm:px-3",
                       isActive
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "border-aqua/50 bg-aqua/10 text-foreground"
+                        : "border-transparent text-sub hover:text-foreground"
                     )
                   }
                 >
@@ -55,7 +55,7 @@ export default function AppLayout() {
           </Button>
         </div>
       </header>
-      <main className="container py-6">
+       <main className="container py-5 sm:py-7">
         <Outlet />
       </main>
     </div>

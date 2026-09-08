@@ -2,39 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
 @layer base {
   :root {
-    --background: 210 29% 24%;
-    --foreground: 210 20% 90%;
+    --background: 222 30% 10%;
+    --foreground: 216 28% 93%;
 
-    --card: 210 25% 20%;
-    --card-foreground: 210 20% 92%;
+    --card: 220 25% 15%;
+    --card-foreground: 216 28% 93%;
+    --panel: 220 25% 15%;
+    --line: 218 20% 29%;
+    --sub: 217 14% 65%;
+    --aqua: 166 72% 67%;
+    --lilac: 282 58% 70%;
+    --amber: 43 88% 65%;
+    --rose: 351 70% 66%;
 
-    --popover: 210 25% 18%;
-    --popover-foreground: 210 20% 92%;
+    --popover: 220 27% 13%;
+    --popover-foreground: 216 28% 93%;
 
-    --primary: 204 70% 53%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 166 72% 67%;
+    --primary-foreground: 222 30% 10%;
 
-    --secondary: 210 20% 30%;
-    --secondary-foreground: 210 20% 88%;
+    --secondary: 220 19% 22%;
+    --secondary-foreground: 216 28% 90%;
 
-    --muted: 210 18% 28%;
-    --muted-foreground: 210 12% 58%;
+    --muted: 220 18% 20%;
+    --muted-foreground: 217 14% 65%;
 
-    --accent: 210 22% 32%;
-    --accent-foreground: 210 20% 90%;
+    --accent: 166 35% 20%;
+    --accent-foreground: 166 72% 72%;
 
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 351 70% 66%;
+    --destructive-foreground: 222 30% 10%;
 
-    --border: 210 18% 32%;
-    --input: 210 18% 28%;
-    --ring: 204 70% 53%;
+    --border: 218 20% 29%;
+    --input: 218 20% 29%;
+    --ring: 166 72% 67%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
     --sidebar-background: 210 28% 18%;
     --sidebar-foreground: 210 20% 88%;
@@ -46,10 +51,10 @@
     --sidebar-ring: 204 70% 53%;
 
     /* Priority colors */
-    --priority-none: 210 12% 50%;
-    --priority-low: 140 50% 46%;
-    --priority-medium: 45 90% 55%;
-    --priority-high: 0 70% 55%;
+    --priority-none: 217 14% 65%;
+    --priority-low: 166 72% 67%;
+    --priority-medium: 43 88% 65%;
+    --priority-high: 351 70% 66%;
   }
 }
 
@@ -59,11 +64,25 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
-    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    @apply bg-background text-foreground font-sans antialiased;
+    min-width: 320px;
+    color-scheme: dark;
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: 0;
   }
 
   code, pre, .font-mono {
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  h1, h2, h3 { letter-spacing: 0; }
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-line bg-panel/60 backdrop-blur-xl;
+  }
+  .section-label {
+    @apply font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-sub;
   }
 }

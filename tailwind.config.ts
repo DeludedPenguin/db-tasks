@@ -19,6 +19,13 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        panel: "hsl(var(--panel))",
+        line: "hsl(var(--line))",
+        sub: "hsl(var(--sub))",
+        aqua: "hsl(var(--aqua))",
+        lilac: "hsl(var(--lilac))",
+        amber: "hsl(var(--amber))",
+        rose: "hsl(var(--rose))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

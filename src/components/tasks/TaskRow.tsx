@@ -21,8 +21,8 @@ export default function TaskRow({ task, selected, tags = [], onSelect, onToggleC
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/50",
-        selected && "ring-1 ring-primary/40"
+        "group flex items-center gap-3 rounded-xl border border-line bg-panel/55 px-3 py-2.5 backdrop-blur-xl transition duration-100 hover:border-aqua/40 sm:px-4 sm:py-3",
+        selected && "border-aqua/50 bg-aqua/5 ring-1 ring-aqua/30"
       )}
     >
       <Checkbox
@@ -39,7 +39,7 @@ export default function TaskRow({ task, selected, tags = [], onSelect, onToggleC
         className="flex flex-1 items-center gap-2 text-left min-w-0 flex-wrap"
         onClick={() => onEdit(task)}
       >
-        <span className={cn("truncate font-medium", task.completed && "line-through text-muted-foreground")}>
+        <span className={cn("truncate text-[14px] font-semibold sm:text-[15px]", task.completed && "line-through text-muted-foreground")}> 
           {task.name}
         </span>
         {project && (

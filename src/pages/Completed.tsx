@@ -31,7 +31,7 @@ export default function Completed() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-semibold tracking-tight">Completed Tasks</h2>
+      <h2 className="section-label">Completed tasks</h2>
 
       <CompletionChart tasks={tasks} />
 

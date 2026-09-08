@@ -51,17 +51,17 @@ export default function AddTaskForm({ projects }: { projects: Project[] }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-card p-3">
+    <form onSubmit={handleSubmit} className="glass-panel flex flex-wrap items-end gap-2 rounded-xl p-3 sm:p-4">
       <div className="flex-1 min-w-[200px]">
         <Input
           placeholder="New task…"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="bg-background"
+          className="bg-panel/60"
         />
       </div>
       <Select value={projectId} onValueChange={setProjectId}>
-        <SelectTrigger className="w-[140px] bg-background">
+        <SelectTrigger className="w-[140px] bg-panel/60">
           <SelectValue placeholder="Project" />
         </SelectTrigger>
         <SelectContent>
@@ -77,7 +77,7 @@ export default function AddTaskForm({ projects }: { projects: Project[] }) {
         </SelectContent>
       </Select>
       <Select value={priority} onValueChange={setPriority}>
-        <SelectTrigger className="w-[110px] bg-background">
+        <SelectTrigger className="w-[110px] bg-panel/60">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
