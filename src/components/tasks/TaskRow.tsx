@@ -44,7 +44,7 @@ export default function TaskRow({ task, selected, tags = [], onSelect, onToggleC
         </span>
         {project && (
           <span
-            className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+            className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-xs font-medium"
             style={{
               backgroundColor: `${project.color}22`,
               color: project.color,
@@ -59,9 +59,9 @@ export default function TaskRow({ task, selected, tags = [], onSelect, onToggleC
           <TagBadge key={tag.id} tag={tag} />
         ))}
       </button>
-      <div className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
+      <div className="hidden shrink-0 items-center gap-2 font-mono text-xs text-muted-foreground sm:flex">
         {isOverdue && (
-          <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+          <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 font-mono text-xs font-medium text-destructive">
             overdue
           </span>
         )}
