@@ -254,8 +254,8 @@ export const db = {
       sb.from("focus_sessions").select("*").eq("user_id", uid).then(unwrap),
     ]);
     const taskIds = (tasks ?? []).map((t: Row) => t.id);
-    const task_tags = taskIds.length
-      ? unwrap(await sb.from("task_tags").select("*").in("task_id", taskIds))
+    const task_tags: Row[] = taskIds.length
+      ? ((unwrap(await sb.from("task_tags").select("*").in("task_id", taskIds)) as Row[]) ?? [])
       : [];
     return {
       format: "db_tasks_backup",
