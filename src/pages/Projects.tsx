@@ -74,7 +74,7 @@ export default function Projects() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">Projects</h2>
+        <h2 className="font-mono text-2xl font-semibold tracking-tight text-foreground">Projects</h2>
         <Button onClick={openCreate} size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" /> New Project
         </Button>
@@ -88,7 +88,7 @@ export default function Projects() {
           <p className="mt-3 text-muted-foreground">No projects yet. Create one to get started.</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 font-mono sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => {
             const c = counts?.[p.id];
             return (

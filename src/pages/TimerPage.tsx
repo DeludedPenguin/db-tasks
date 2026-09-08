@@ -122,7 +122,7 @@ export default function TimerPage() {
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <h2 className="text-2xl font-semibold tracking-tight">Focus Timer</h2>
+      <h2 className="font-mono text-2xl font-semibold tracking-tight">Focus Timer</h2>
 
       {/* Presets */}
       <div className="flex gap-2">
