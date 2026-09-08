@@ -38,7 +38,10 @@ export default function ImportExport() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
+  const [backup, setBackup] = useState<BackupFile | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
   const { data: activeTasks = [] } = useTasks(false);
