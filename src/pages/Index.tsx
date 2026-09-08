@@ -115,7 +115,7 @@ export default function Index() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
+          <h2 className="section-label">Active tasks</h2>
           {completedToday > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary">
               <CheckCircle2 className="h-3 w-3" />
