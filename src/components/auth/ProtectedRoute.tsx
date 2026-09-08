@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { SELF_HOSTED } from "@/lib/data";
 import type { Session } from "@supabase/supabase-js";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
+    if (SELF_HOSTED) return; // Self-hosted single-user mode: no login
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -17,6 +19,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
     return () => subscription.unsubscribe();
   }, []);
+
+  if (SELF_HOSTED) return <>{children}</>;
 
   if (session === undefined) {
     return (

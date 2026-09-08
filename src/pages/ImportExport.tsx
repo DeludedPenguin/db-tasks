@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Download, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, Download, FileText, CheckCircle2, AlertCircle, DatabaseBackup } from "lucide-react";
 import {
   parseCSV,
   mapSuperProductivityCSV,
@@ -15,7 +15,7 @@ import {
   type NativeImportedSession,
   type CSVFormat,
 } from "@/lib/csv";
-import { supabase } from "@/integrations/supabase/client";
+import { db, downloadJSON, type BackupFile } from "@/lib/data";
 import { useTasks, useProjects } from "@/hooks/useTasks";
 import { useFocusSessions } from "@/hooks/useFocusSessions";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,7 +38,10 @@ export default function ImportExport() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
+  const [backup, setBackup] = useState<BackupFile | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
   const { data: activeTasks = [] } = useTasks(false);
@@ -77,28 +80,31 @@ export default function ImportExport() {
     e.target.value = "";
   };
 
-  const ensureProjects = async (userId: string, projectNames: { name: string; color: string }[]) => {
-    const { data: existing } = await supabase.from("projects").select("name").eq("user_id", userId);
-    const existingNames = new Set((existing ?? []).map((p) => p.name));
+  const ensureProjects = async (projectNames: { name: string; color: string }[]) => {
+    const existing = await db.listProjects();
+    const existingNames = new Set(existing.map((p) => p.name));
     const newProjects = projectNames.filter((p) => p.name && !existingNames.has(p.name));
-    if (newProjects.length > 0) {
-      await supabase.from("projects").insert(newProjects.map((p) => ({ ...p, user_id: userId })));
-    }
-    const { data: all } = await supabase.from("projects").select("id, name").eq("user_id", userId);
-    return new Map((all ?? []).map((p) => [p.name, p.id]));
+    if (newProjects.length > 0) await db.createProjects(newProjects);
+    const all = await db.listProjects();
+    return new Map(all.map((p) => [p.name as string, p.id as string]));
+  };
+
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["project-task-counts"] });
+    qc.invalidateQueries({ queryKey: ["focus-sessions"] });
+    qc.invalidateQueries({ queryKey: ["tags"] });
+    qc.invalidateQueries({ queryKey: ["task-tags"] });
   };
 
   const handleImport = async () => {
     if (!preview) return;
     setImporting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
       if (preview.type === "super_productivity") {
-        const projectMap = await ensureProjects(user.id, preview.projects);
+        const projectMap = await ensureProjects(preview.projects);
         const taskRows = preview.tasks.map((t) => ({
-          user_id: user.id,
           name: t.name,
           project_id: t.projectTitle ? projectMap.get(t.projectTitle) ?? null : null,
           due_date: t.dueDate,
@@ -108,13 +114,11 @@ export default function ImportExport() {
           notes: t.notes,
           priority: t.priority,
         }));
-        const { error } = await supabase.from("tasks").insert(taskRows);
-        if (error) throw error;
+        await db.createTasks(taskRows);
         toast.success(`Imported ${taskRows.length} tasks`);
       } else if (preview.type === "active_tasks" || preview.type === "completed_tasks") {
-        const projectMap = await ensureProjects(user.id, preview.projects);
+        const projectMap = await ensureProjects(preview.projects);
         const taskRows = preview.tasks.map((t) => ({
-          user_id: user.id,
           name: t.name,
           project_id: t.projectName ? projectMap.get(t.projectName) ?? null : null,
           due_date: t.dueDate,
@@ -124,16 +128,14 @@ export default function ImportExport() {
           notes: t.notes,
           priority: t.priority,
         }));
-        const { error } = await supabase.from("tasks").insert(taskRows);
-        if (error) throw error;
+        await db.createTasks(taskRows);
         toast.success(`Imported ${taskRows.length} ${preview.type === "active_tasks" ? "active" : "completed"} tasks`);
       } else if (preview.type === "focus_log") {
         // Try to match task names to existing tasks
-        const { data: allTasks } = await supabase.from("tasks").select("id, name").eq("user_id", user.id);
-        const taskNameMap = new Map((allTasks ?? []).map((t) => [t.name, t.id]));
+        const allTasks = await db.listAllTasks();
+        const taskNameMap = new Map(allTasks.map((t) => [t.name as string, t.id as string]));
 
         const sessionRows = preview.sessions.map((s) => ({
-          user_id: user.id,
           date: s.date,
           planned_minutes: s.plannedMinutes,
           actual_minutes: s.actualMinutes,
@@ -142,22 +144,65 @@ export default function ImportExport() {
           task_id: s.taskName ? taskNameMap.get(s.taskName) ?? null : null,
           notes: s.notes,
         }));
-        const { error } = await supabase.from("focus_sessions").insert(sessionRows);
-        if (error) throw error;
+        await db.createFocusSessions(sessionRows);
         toast.success(`Imported ${sessionRows.length} focus sessions`);
       }
 
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      qc.invalidateQueries({ queryKey: ["project-task-counts"] });
-      qc.invalidateQueries({ queryKey: ["focus-sessions"] });
-
+      refreshAll();
       setImportDone(true);
       setPreview(null);
     } catch (err: any) {
       toast.error("Import failed: " + err.message);
     } finally {
       setImporting(false);
+    }
+  };
+
+  const exportBackup = async () => {
+    try {
+      const backup = await db.exportBackup();
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadJSON(backup, `db-tasks-backup-${stamp}.json`);
+      const d = backup.data;
+      toast.success(
+        `Backup saved — ${d.tasks.length} tasks, ${d.projects.length} projects, ${d.tags.length} tags, ${d.focus_sessions.length} sessions`,
+      );
+    } catch (err: any) {
+      toast.error("Backup failed: " + err.message);
+    }
+  };
+
+  const handleBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result)) as BackupFile;
+        if (parsed?.format !== "db_tasks_backup") throw new Error("Not a DB_Tasks backup file");
+        setBackup(parsed);
+      } catch (err: any) {
+        toast.error("Could not read backup: " + err.message);
+        setBackup(null);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const restoreBackup = async (mode: "merge" | "replace") => {
+    if (!backup) return;
+    if (mode === "replace" && !confirm("Replace everything currently in the app with this backup? This cannot be undone.")) return;
+    setRestoring(true);
+    try {
+      await db.importBackup(backup, mode);
+      refreshAll();
+      setBackup(null);
+      toast.success(mode === "replace" ? "Backup restored (everything replaced)" : "Backup merged in");
+    } catch (err: any) {
+      toast.error("Restore failed: " + err.message);
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -326,12 +371,61 @@ export default function ImportExport() {
         </CardContent>
       </Card>
 
-      {/* Export Section */}
+      {/* Full backup (JSON) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <DatabaseBackup className="h-5 w-5 text-primary" />
+            Full Backup (JSON)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="font-mono text-sm text-muted-foreground">
+            A complete, lossless snapshot of everything: tasks, projects, tags, tag links and focus
+            sessions, with their IDs intact. Restore it later to get the exact same data back.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" onClick={exportBackup}>
+              <Download className="h-4 w-4 mr-2" />
+              Download Backup
+            </Button>
+            <input ref={backupRef} type="file" accept=".json" onChange={handleBackupFile} className="hidden" />
+            <Button variant="outline" onClick={() => backupRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" />
+              Select Backup File
+            </Button>
+          </div>
+
+          {backup && (
+            <div className="space-y-3 rounded-md border border-border p-4">
+              <div className="font-mono text-xs text-muted-foreground">
+                Backup from {new Date(backup.exported_at).toLocaleString()} —{" "}
+                {backup.data.tasks.length} tasks, {backup.data.projects.length} projects,{" "}
+                {backup.data.tags.length} tags, {backup.data.task_tags.length} tag links,{" "}
+                {backup.data.focus_sessions.length} focus sessions
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => restoreBackup("merge")} disabled={restoring}>
+                  {restoring ? "Restoring…" : "Merge into current data"}
+                </Button>
+                <Button variant="destructive" onClick={() => restoreBackup("replace")} disabled={restoring}>
+                  Replace everything
+                </Button>
+                <Button variant="ghost" onClick={() => setBackup(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* CSV Export Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Download className="h-5 w-5 text-primary" />
-            Export Data
+            Export CSV (for spreadsheets)
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">

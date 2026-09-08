@@ -3,6 +3,7 @@ import { CheckSquare, Archive, FolderOpen, Timer, ScrollText, ArrowUpDown, LogOu
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { SELF_HOSTED } from "@/lib/data";
 
 const navItems = [
   { to: "/", label: "Tasks", icon: CheckSquare },
@@ -50,9 +51,11 @@ export default function AppLayout() {
               ))}
             </nav>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleLogout} title="Log out">
-            <LogOut className="h-4 w-4" />
-          </Button>
+          {!SELF_HOSTED && (
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Log out">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </header>
        <main className="container py-5 sm:py-7">
