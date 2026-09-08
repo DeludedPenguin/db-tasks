@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Download, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, Download, FileText, CheckCircle2, AlertCircle, DatabaseBackup } from "lucide-react";
 import {
   parseCSV,
   mapSuperProductivityCSV,
@@ -371,12 +371,61 @@ export default function ImportExport() {
         </CardContent>
       </Card>
 
-      {/* Export Section */}
+      {/* Full backup (JSON) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <DatabaseBackup className="h-5 w-5 text-primary" />
+            Full Backup (JSON)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="font-mono text-sm text-muted-foreground">
+            A complete, lossless snapshot of everything: tasks, projects, tags, tag links and focus
+            sessions, with their IDs intact. Restore it later to get the exact same data back.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" onClick={exportBackup}>
+              <Download className="h-4 w-4 mr-2" />
+              Download Backup
+            </Button>
+            <input ref={backupRef} type="file" accept=".json" onChange={handleBackupFile} className="hidden" />
+            <Button variant="outline" onClick={() => backupRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" />
+              Select Backup File
+            </Button>
+          </div>
+
+          {backup && (
+            <div className="space-y-3 rounded-md border border-border p-4">
+              <div className="font-mono text-xs text-muted-foreground">
+                Backup from {new Date(backup.exported_at).toLocaleString()} —{" "}
+                {backup.data.tasks.length} tasks, {backup.data.projects.length} projects,{" "}
+                {backup.data.tags.length} tags, {backup.data.task_tags.length} tag links,{" "}
+                {backup.data.focus_sessions.length} focus sessions
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => restoreBackup("merge")} disabled={restoring}>
+                  {restoring ? "Restoring…" : "Merge into current data"}
+                </Button>
+                <Button variant="destructive" onClick={() => restoreBackup("replace")} disabled={restoring}>
+                  Replace everything
+                </Button>
+                <Button variant="ghost" onClick={() => setBackup(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* CSV Export Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Download className="h-5 w-5 text-primary" />
-            Export Data
+            Export CSV (for spreadsheets)
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
