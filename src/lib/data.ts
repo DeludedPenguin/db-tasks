@@ -12,6 +12,9 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 
+// Untyped view of the client: this module hands it plain rows.
+const sb = supabase as any;
+
 export const API_URL: string = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 export const SELF_HOSTED = API_URL.length > 0;
 
@@ -81,13 +84,13 @@ export const db = {
 
   async listAllTasks(): Promise<Row[]> {
     if (SELF_HOSTED) return api(`/api/tasks`);
-    return unwrap(await supabase.from("tasks").select("*").eq("user_id", await userId()));
+    return unwrap(await sb.from("tasks").select("*").eq("user_id", await userId()));
   },
 
   async createTask(task: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/tasks`, { method: "POST", body: JSON.stringify(stripUser(task)) });
     return unwrap(
-      await supabase.from("tasks").insert({ ...task, user_id: await userId() }).select().single(),
+      await sb.from("tasks").insert({ ...task, user_id: await userId() }).select().single(),
     );
   },
 
@@ -96,13 +99,13 @@ export const db = {
     if (SELF_HOSTED) return api(`/api/tasks`, { method: "POST", body: JSON.stringify(tasks.map(stripUser)) });
     const uid = await userId();
     return unwrap(
-      await supabase.from("tasks").insert(tasks.map((t) => ({ ...t, user_id: uid }))).select(),
+      await sb.from("tasks").insert(tasks.map((t) => ({ ...t, user_id: uid }))).select(),
     );
   },
 
   async updateTask(id: string, updates: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(stripUser(updates)) });
-    return unwrap(await supabase.from("tasks").update(updates).eq("id", id).select().single());
+    return unwrap(await sb.from("tasks").update(updates).eq("id", id).select().single());
   },
 
   async deleteTasks(ids: string[]): Promise<void> {
@@ -111,7 +114,7 @@ export const db = {
       await api(`/api/tasks/delete`, { method: "POST", body: JSON.stringify({ ids }) });
       return;
     }
-    const { error } = await supabase.from("tasks").delete().in("id", ids);
+    const { error } = await sb.from("tasks").delete().in("id", ids);
     if (error) throw error;
   },
 
@@ -119,13 +122,13 @@ export const db = {
 
   async listProjects(): Promise<Row[]> {
     if (SELF_HOSTED) return api(`/api/projects`);
-    return unwrap(await supabase.from("projects").select("*").eq("user_id", await userId()).order("name"));
+    return unwrap(await sb.from("projects").select("*").eq("user_id", await userId()).order("name"));
   },
 
   async createProject(project: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/projects`, { method: "POST", body: JSON.stringify(stripUser(project)) });
     return unwrap(
-      await supabase.from("projects").insert({ ...project, user_id: await userId() }).select().single(),
+      await sb.from("projects").insert({ ...project, user_id: await userId() }).select().single(),
     );
   },
 
@@ -134,18 +137,18 @@ export const db = {
     if (SELF_HOSTED) return api(`/api/projects`, { method: "POST", body: JSON.stringify(projects.map(stripUser)) });
     const uid = await userId();
     return unwrap(
-      await supabase.from("projects").insert(projects.map((p) => ({ ...p, user_id: uid }))).select(),
+      await sb.from("projects").insert(projects.map((p) => ({ ...p, user_id: uid }))).select(),
     );
   },
 
   async updateProject(id: string, updates: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(updates) });
-    return unwrap(await supabase.from("projects").update(updates).eq("id", id).select().single());
+    return unwrap(await sb.from("projects").update(updates).eq("id", id).select().single());
   },
 
   async deleteProject(id: string): Promise<void> {
     if (SELF_HOSTED) return api(`/api/projects/${id}`, { method: "DELETE" });
-    const { error } = await supabase.from("projects").delete().eq("id", id);
+    const { error } = await sb.from("projects").delete().eq("id", id);
     if (error) throw error;
   },
 
@@ -153,24 +156,24 @@ export const db = {
 
   async listTags(): Promise<Row[]> {
     if (SELF_HOSTED) return api(`/api/tags`);
-    return unwrap(await supabase.from("tags").select("*").eq("user_id", await userId()).order("name"));
+    return unwrap(await sb.from("tags").select("*").eq("user_id", await userId()).order("name"));
   },
 
   async createTag(tag: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/tags`, { method: "POST", body: JSON.stringify(stripUser(tag)) });
     return unwrap(
-      await supabase.from("tags").insert({ ...tag, user_id: await userId() }).select().single(),
+      await sb.from("tags").insert({ ...tag, user_id: await userId() }).select().single(),
     );
   },
 
   async updateTag(id: string, updates: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/tags/${id}`, { method: "PATCH", body: JSON.stringify(updates) });
-    return unwrap(await supabase.from("tags").update(updates).eq("id", id).select().single());
+    return unwrap(await sb.from("tags").update(updates).eq("id", id).select().single());
   },
 
   async deleteTag(id: string): Promise<void> {
     if (SELF_HOSTED) return api(`/api/tags/${id}`, { method: "DELETE" });
-    const { error } = await supabase.from("tags").delete().eq("id", id);
+    const { error } = await sb.from("tags").delete().eq("id", id);
     if (error) throw error;
   },
 
@@ -179,7 +182,7 @@ export const db = {
   async listTaskTags(taskIds: string[]): Promise<Row[]> {
     if (!taskIds.length) return [];
     if (SELF_HOSTED) return api(`/api/task-tags?task_ids=${taskIds.join(",")}`);
-    return unwrap(await supabase.from("task_tags").select("*, tags(*)").in("task_id", taskIds));
+    return unwrap(await sb.from("task_tags").select("*, tags(*)").in("task_id", taskIds));
   },
 
   async setTaskTags(taskId: string, tagIds: string[]): Promise<void> {
@@ -187,7 +190,7 @@ export const db = {
       await api(`/api/tasks/${taskId}/tags`, { method: "PUT", body: JSON.stringify({ tagIds }) });
       return;
     }
-    await supabase.from("task_tags").delete().eq("task_id", taskId);
+    await sb.from("task_tags").delete().eq("task_id", taskId);
     if (tagIds.length) {
       const { error } = await supabase
         .from("task_tags")
@@ -212,7 +215,7 @@ export const db = {
   async createFocusSession(session: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/focus-sessions`, { method: "POST", body: JSON.stringify(stripUser(session)) });
     return unwrap(
-      await supabase.from("focus_sessions").insert({ ...session, user_id: await userId() }).select().single(),
+      await sb.from("focus_sessions").insert({ ...session, user_id: await userId() }).select().single(),
     );
   },
 
@@ -223,18 +226,18 @@ export const db = {
     }
     const uid = await userId();
     return unwrap(
-      await supabase.from("focus_sessions").insert(sessions.map((s) => ({ ...s, user_id: uid }))).select(),
+      await sb.from("focus_sessions").insert(sessions.map((s) => ({ ...s, user_id: uid }))).select(),
     );
   },
 
   async updateFocusSession(id: string, updates: Row): Promise<Row> {
     if (SELF_HOSTED) return api(`/api/focus-sessions/${id}`, { method: "PATCH", body: JSON.stringify(updates) });
-    return unwrap(await supabase.from("focus_sessions").update(updates).eq("id", id).select().single());
+    return unwrap(await sb.from("focus_sessions").update(updates).eq("id", id).select().single());
   },
 
   async deleteFocusSession(id: string): Promise<void> {
     if (SELF_HOSTED) return api(`/api/focus-sessions/${id}`, { method: "DELETE" });
-    const { error } = await supabase.from("focus_sessions").delete().eq("id", id);
+    const { error } = await sb.from("focus_sessions").delete().eq("id", id);
     if (error) throw error;
   },
 
@@ -245,14 +248,14 @@ export const db = {
     if (SELF_HOSTED) return api(`/api/backup`);
     const uid = await userId();
     const [projects, tasks, tags, focus_sessions] = await Promise.all([
-      supabase.from("projects").select("*").eq("user_id", uid).then(unwrap),
-      supabase.from("tasks").select("*").eq("user_id", uid).then(unwrap),
-      supabase.from("tags").select("*").eq("user_id", uid).then(unwrap),
-      supabase.from("focus_sessions").select("*").eq("user_id", uid).then(unwrap),
+      sb.from("projects").select("*").eq("user_id", uid).then(unwrap),
+      sb.from("tasks").select("*").eq("user_id", uid).then(unwrap),
+      sb.from("tags").select("*").eq("user_id", uid).then(unwrap),
+      sb.from("focus_sessions").select("*").eq("user_id", uid).then(unwrap),
     ]);
     const taskIds = (tasks ?? []).map((t: Row) => t.id);
     const task_tags = taskIds.length
-      ? unwrap(await supabase.from("task_tags").select("*").in("task_id", taskIds))
+      ? unwrap(await sb.from("task_tags").select("*").in("task_id", taskIds))
       : [];
     return {
       format: "db_tasks_backup",
@@ -281,15 +284,15 @@ export const db = {
     const uid = await userId();
     const d = backup.data;
     if (mode === "replace") {
-      await supabase.from("focus_sessions").delete().eq("user_id", uid);
-      await supabase.from("tasks").delete().eq("user_id", uid);
-      await supabase.from("tags").delete().eq("user_id", uid);
-      await supabase.from("projects").delete().eq("user_id", uid);
+      await sb.from("focus_sessions").delete().eq("user_id", uid);
+      await sb.from("tasks").delete().eq("user_id", uid);
+      await sb.from("tags").delete().eq("user_id", uid);
+      await sb.from("projects").delete().eq("user_id", uid);
     }
     const withUser = (rows: Row[] = []) => rows.map((r) => ({ ...stripUser(r), user_id: uid }));
     const upsert = async (table: "projects" | "tags" | "tasks" | "focus_sessions", rows: Row[]) => {
       if (!rows.length) return;
-      const { error } = await supabase.from(table).upsert(rows, { onConflict: "id" });
+      const { error } = await sb.from(table).upsert(rows, { onConflict: "id" });
       if (error) throw error;
     };
     await upsert("projects", withUser(d.projects));
@@ -297,7 +300,7 @@ export const db = {
     await upsert("tasks", withUser(d.tasks));
     await upsert("focus_sessions", withUser(d.focus_sessions));
     if (d.task_tags?.length) {
-      const { error } = await supabase.from("task_tags").upsert(d.task_tags, { onConflict: "id" });
+      const { error } = await sb.from("task_tags").upsert(d.task_tags, { onConflict: "id" });
       if (error) throw error;
     }
   },
