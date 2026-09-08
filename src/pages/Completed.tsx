@@ -33,7 +33,7 @@ export default function Completed() {
     <div className="space-y-4">
       <h2 className="section-label">Completed tasks</h2>
 
-      <CompletionChart tasks={tasks} />
+      <CompletionChart tasks={tasks as { completed_at: string }[]} />
 
       <BulkActions
         selectedIds={Array.from(selected)}
