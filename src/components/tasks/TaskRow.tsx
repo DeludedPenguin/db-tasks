@@ -39,7 +39,7 @@ export default function TaskRow({ task, selected, tags = [], onSelect, onToggleC
         className="flex flex-1 items-center gap-2 text-left min-w-0 flex-wrap"
         onClick={() => onEdit(task)}
       >
-        <span className={cn("truncate text-[14px] font-semibold sm:text-[15px]", task.completed && "line-through text-muted-foreground")}> 
+        <span className={cn("truncate font-mono text-[14px] font-semibold sm:text-[15px]", task.completed && "line-through text-muted-foreground")}> 
           {task.name}
         </span>
         {project && (
