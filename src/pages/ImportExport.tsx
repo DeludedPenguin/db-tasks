@@ -220,7 +220,7 @@ export default function ImportExport() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-sm text-muted-foreground">
             Upload a CSV exported from this app or from Super Productivity. The format is auto-detected.
           </p>
           <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />

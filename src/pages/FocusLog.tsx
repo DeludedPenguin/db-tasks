@@ -15,11 +15,11 @@ export default function FocusLog() {
   };
 
   if (isLoading) {
-    return <p className="text-muted-foreground">Loading…</p>;
+    return <p className="font-mono text-muted-foreground">Loading…</p>;
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 font-mono">
       <h2 className="text-2xl font-semibold tracking-tight">Focus Log</h2>
 
       {!sessions?.length && (
