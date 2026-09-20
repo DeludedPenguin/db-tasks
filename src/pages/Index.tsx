@@ -52,15 +52,17 @@ export default function Index() {
         const tags = taskTagsMap[task.id] ?? [];
         if (!filterTagIds.some((fid) => tags.some((t: any) => t.id === fid))) return false;
       }
-      // Date filter
+      // Date filter — compare plain yyyy-MM-dd strings, since due_date/do_date
+      // may arrive as full ISO timestamps (e.g. from a Postgres DATE column).
       if (dateFilter !== "all") {
-        const due = task.due_date;
-        const doDate = task.do_date;
+        const due = task.due_date ? String(task.due_date).slice(0, 10) : null;
+        const doDate = task.do_date ? String(task.do_date).slice(0, 10) : null;
         if (dateFilter === "today") return due === today;
         if (dateFilter === "do_or_due_today") return due === today || doDate === today;
         if (dateFilter === "overdue") return !!due && due <= today;
         if (dateFilter === "upcoming") return !!due && due > today;
         if (dateFilter === "no_due") return !due;
+        if (dateFilter === "has_due") return !!due;
       }
       return true;
     });
@@ -123,7 +125,7 @@ export default function Index() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <DateFilter value={dateFilter} onChange={setDateFilter} />
           <TagFilter selectedTagIds={filterTagIds} onChange={setFilterTagIds} />
           <SortControls sortKey={sortKey} onSort={setSortKey} />

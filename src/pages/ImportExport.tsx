@@ -10,6 +10,7 @@ import {
   detectCSVFormatFromText,
   mapNativeTaskCSV,
   mapNativeFocusLogCSV,
+  mapTodoistCSV,
   type ImportedTask,
   type NativeImportedTask,
   type NativeImportedSession,
@@ -23,11 +24,12 @@ import { toast } from "sonner";
 
 type PreviewData =
   | { type: "super_productivity"; tasks: ImportedTask[]; projects: { name: string; color: string }[] }
-  | { type: "active_tasks" | "completed_tasks"; tasks: NativeImportedTask[]; projects: { name: string; color: string }[] }
+  | { type: "active_tasks" | "completed_tasks" | "todoist"; tasks: NativeImportedTask[]; projects: { name: string; color: string }[] }
   | { type: "focus_log"; sessions: NativeImportedSession[] };
 
 const FORMAT_LABELS: Record<CSVFormat, string> = {
   super_productivity: "Super Productivity Export",
+  todoist: "Todoist Project Export",
   active_tasks: "Active Tasks Export",
   completed_tasks: "Completed Tasks Export",
   focus_log: "Focus Log Export",
@@ -67,11 +69,33 @@ export default function ImportExport() {
       } else if (format === "completed_tasks") {
         const result = mapNativeTaskCSV(rows, true);
         setPreview({ type: "completed_tasks", ...result });
+      } else if (format === "todoist") {
+        // Todoist exports one project at a time with no project column in
+        // the file itself, so the project name has to come from the person —
+        // default to the filename (minus extension) as a reasonable guess.
+        const defaultName = file.name.replace(/\.csv$/i, "");
+        const projectName = window.prompt(
+          "Todoist export detected. What project should these tasks be imported into?",
+          defaultName,
+        );
+        if (projectName === null) {
+          setPreview(null);
+          return;
+        }
+        const result = mapTodoistCSV(rows);
+        const tasks = result.tasks.map((t) => ({ ...t, projectName: projectName.trim() }));
+        const projects = projectName.trim() ? [{ name: projectName.trim(), color: "#3498db" }] : [];
+        if (result.skippedSections > 0 || result.skippedNotes > 0) {
+          toast.info(
+            `Skipped ${result.skippedSections} section row(s); merged ${result.skippedNotes} note row(s) into task notes.`,
+          );
+        }
+        setPreview({ type: "todoist", tasks, projects });
       } else if (format === "focus_log") {
         const sessions = mapNativeFocusLogCSV(rows);
         setPreview({ type: "focus_log", sessions });
       } else {
-        toast.error("Unrecognised CSV format. Please use a file exported from this app or Super Productivity.");
+        toast.error("Unrecognised CSV format. Please use a file exported from this app, Todoist, or Super Productivity.");
         setPreview(null);
       }
     };
@@ -116,7 +140,7 @@ export default function ImportExport() {
         }));
         await db.createTasks(taskRows);
         toast.success(`Imported ${taskRows.length} tasks`);
-      } else if (preview.type === "active_tasks" || preview.type === "completed_tasks") {
+      } else if (preview.type === "active_tasks" || preview.type === "completed_tasks" || preview.type === "todoist") {
         const projectMap = await ensureProjects(preview.projects);
         const taskRows = preview.tasks.map((t) => ({
           name: t.name,
@@ -129,7 +153,8 @@ export default function ImportExport() {
           priority: t.priority,
         }));
         await db.createTasks(taskRows);
-        toast.success(`Imported ${taskRows.length} ${preview.type === "active_tasks" ? "active" : "completed"} tasks`);
+        const label = preview.type === "active_tasks" ? "active" : preview.type === "completed_tasks" ? "completed" : "Todoist";
+        toast.success(`Imported ${taskRows.length} ${label} tasks`);
       } else if (preview.type === "focus_log") {
         // Try to match task names to existing tasks
         const allTasks = await db.listAllTasks();

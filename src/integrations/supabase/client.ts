@@ -8,11 +8,27 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
+//
+// Constructed lazily: in self-hosted mode (VITE_API_URL set, see
+// src/lib/data.ts) this client is imported but never actually called, since
+// every read/write goes to the Express API instead. Building it eagerly at
+// module load would throw immediately because VITE_SUPABASE_URL/KEY are
+// intentionally unset in a self-hosted build.
+let _supabase: ReturnType<typeof createClient<Database>> | undefined;
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: brokeredPreviewStorage(),
-    persistSession: true,
-    autoRefreshToken: true,
-  }
+function createSupabaseClient() {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      storage: brokeredPreviewStorage(),
+      persistSession: true,
+      autoRefreshToken: true,
+    }
+  });
+}
+
+export const supabase = new Proxy({} as ReturnType<typeof createClient<Database>>, {
+  get(_, prop, receiver) {
+    if (!_supabase) _supabase = createSupabaseClient();
+    return Reflect.get(_supabase, prop, receiver);
+  },
 });
