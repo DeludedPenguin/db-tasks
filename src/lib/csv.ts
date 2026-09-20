@@ -1,25 +1,45 @@
 // CSV parsing and generation utilities
 
-export function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) return [];
-  const headers = parseCSVLine(lines[0]);
-  return lines.slice(1).map((line) => {
-    const values = parseCSVLine(line);
+// Parses the whole file as one character stream (RFC 4180 aware): a quoted
+// field may contain literal newlines, commas, and escaped `""` quotes, so
+// splitting on `\n` before parsing (the previous approach) shreds any row
+// with a multi-line quoted field — e.g. pasted notes — into multiple
+// mis-aligned rows, shifting every later column left.
+//
+// delimiter defaults to comma but can be overridden (e.g. ";" for Todoist's
+// semicolon-delimited exports).
+export function parseCSV(text: string, delimiter = ","): Record<string, string>[] {
+  const rows = parseCSVRows(text, delimiter);
+  if (rows.length < 2) return [];
+  const headers = rows[0];
+  return rows.slice(1).map((values) => {
     const row: Record<string, string> = {};
     headers.forEach((h, i) => (row[h.trim()] = (values[i] ?? "").trim()));
     return row;
   });
 }
 
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
+// Best-effort delimiter sniff: count unquoted commas vs semicolons in the
+// header line. Todoist's own export is semicolon-delimited by design.
+function detectDelimiter(text: string): "," | ";" {
+  const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
+  const commas = (firstLine.match(/,/g) || []).length;
+  const semicolons = (firstLine.match(/;/g) || []).length;
+  return semicolons > commas ? ";" : ",";
+}
+
+function parseCSVRows(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let current = "";
   let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+  let rowHasContent = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
     if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
+      if (ch === '"' && text[i + 1] === '"') {
         current += '"';
         i++;
       } else if (ch === '"') {
@@ -27,19 +47,38 @@ function parseCSVLine(line: string): string[] {
       } else {
         current += ch;
       }
+      continue;
+    }
+
+    if (ch === '"') {
+      inQuotes = true;
+      rowHasContent = true;
+    } else if (ch === delimiter) {
+      row.push(current);
+      current = "";
+      rowHasContent = true;
+    } else if (ch === "\r") {
+      // Skip bare CR; the following \n (if any) ends the row.
+      continue;
+    } else if (ch === "\n") {
+      row.push(current);
+      current = "";
+      if (rowHasContent || row.some((v) => v.trim())) rows.push(row);
+      row = [];
+      rowHasContent = false;
     } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ",") {
-        result.push(current);
-        current = "";
-      } else {
-        current += ch;
-      }
+      current += ch;
+      rowHasContent = true;
     }
   }
-  result.push(current);
-  return result;
+
+  // Flush the final field/row if the file doesn't end with a newline.
+  if (current.length > 0 || rowHasContent) {
+    row.push(current);
+    if (row.some((v) => v.trim())) rows.push(row);
+  }
+
+  return rows;
 }
 
 export function toCSV(rows: Record<string, string | number | boolean | null | undefined>[]): string {
@@ -69,10 +108,11 @@ export function downloadCSV(csv: string, filename: string) {
 }
 
 // CSV format detection
-export type CSVFormat = "super_productivity" | "active_tasks" | "completed_tasks" | "focus_log" | "unknown";
+export type CSVFormat = "super_productivity" | "active_tasks" | "completed_tasks" | "todoist" | "focus_log" | "unknown";
 
 export function detectCSVFormat(headers: string[]): CSVFormat {
   const h = new Set(headers.map((s) => s.trim().toLowerCase()));
+  if (h.has("type") && h.has("content") && h.has("priority") && h.has("indent")) return "todoist";
   if (h.has("title") && h.has("project_title")) return "super_productivity";
   if (h.has("name") && h.has("do_date") && h.has("due_date")) return "active_tasks";
   if (h.has("name") && h.has("completed_at") && !h.has("due_date")) return "completed_tasks";
@@ -81,7 +121,8 @@ export function detectCSVFormat(headers: string[]): CSVFormat {
 }
 
 export function detectCSVFormatFromText(text: string): { format: CSVFormat; rows: Record<string, string>[] } {
-  const rows = parseCSV(text);
+  const delimiter = detectDelimiter(text);
+  const rows = parseCSV(text, delimiter);
   if (rows.length === 0) return { format: "unknown", rows };
   const headers = Object.keys(rows[0]);
   return { format: detectCSVFormat(headers), rows };
@@ -153,6 +194,99 @@ export function mapNativeFocusLogCSV(rows: Record<string, string>[]): NativeImpo
       startTime: r.start_time?.trim() ?? new Date().toISOString(),
       endTime: r.end_time?.trim() || null,
     }));
+}
+
+// Todoist CSV field mapping
+// Todoist's own export/import format: semicolon-delimited, columns TYPE;
+// CONTENT;DESCRIPTION;PRIORITY;INDENT;AUTHOR;RESPONSIBLE;DATE;DATE_LANG;
+// TIMEZONE;DURATION;DURATION_UNIT;meta;DEADLINE;...
+//
+// TYPE is "task", "section", or "note" — only "task" rows become tasks here;
+// "section" rows are skipped (Todoist sections don't map cleanly onto
+// DB_Tasks' flat project model) and "note" rows are comments attached to the
+// task in the row above, appended onto that task's notes rather than
+// imported as their own task.
+//
+// PRIORITY is 1 (highest) to 4 (lowest/default) — inverted from DB_Tasks'
+// 0-3 scale where 3 is highest — so the mapping is dbPriority = 4 - todoist.
+// An empty PRIORITY cell means Todoist's own default of 1 (highest) per its
+// documented format, so it maps to dbPriority 3, not 0.
+//
+// DATE is free text (Todoist accepts natural-language and recurring dates
+// like "every year starting Jan 31"), not a clean ISO string. This does a
+// best-effort Date.parse and falls back to null (no due date) rather than
+// guessing, since a wrong date is worse than a missing one.
+export function mapTodoistCSV(rows: Record<string, string>[]): {
+  tasks: NativeImportedTask[];
+  projects: { name: string; color: string }[];
+  skippedSections: number;
+  skippedNotes: number;
+} {
+  const tasks: NativeImportedTask[] = [];
+  let skippedSections = 0;
+  let skippedNotes = 0;
+
+  for (const r of rows) {
+    const type = (r.TYPE ?? r.type ?? "").trim().toLowerCase();
+
+    if (type === "section") {
+      skippedSections++;
+      continue;
+    }
+
+    if (type === "note") {
+      // Attach as a note-append to the most recently added task, if any —
+      // Todoist orders "note" rows directly after the task they comment on.
+      skippedNotes++;
+      const content = (r.CONTENT ?? r.content ?? "").trim();
+      const last = tasks[tasks.length - 1];
+      if (last && content) {
+        last.notes = last.notes ? `${last.notes}\n\n${content}` : content;
+      }
+      continue;
+    }
+
+    if (type !== "task") continue;
+
+    const name = (r.CONTENT ?? r.content ?? "").trim();
+    if (!name) continue;
+
+    const priorityStr = (r.PRIORITY ?? r.priority ?? "").trim();
+    const todoistPriority = priorityStr ? parseInt(priorityStr, 10) : 1;
+    const dbPriority = Number.isFinite(todoistPriority)
+      ? Math.min(3, Math.max(0, 4 - todoistPriority))
+      : 0;
+
+    const dateStr = (r.DATE ?? r.date ?? "").trim();
+    const dueDate = parseTodoistDate(dateStr);
+
+    const description = (r.DESCRIPTION ?? r.description ?? "").trim();
+
+    tasks.push({
+      name,
+      priority: dbPriority,
+      projectName: "",
+      doDate: null,
+      dueDate,
+      completedAt: null,
+      completed: false,
+      notes: description || null,
+      createdAt: null,
+    });
+  }
+
+  return { tasks, projects: [], skippedSections, skippedNotes };
+}
+
+// Best-effort parse of Todoist's free-text DATE column into an ISO date.
+// Returns null (no due date) rather than a guessed value for anything that
+// doesn't parse cleanly — recurring-date phrasing ("every year...") and
+// relative terms ("next week") aren't reconstructable from the export alone.
+function parseTodoistDate(dateStr: string): string | null {
+  if (!dateStr) return null;
+  if (/^(every|each)\b/i.test(dateStr)) return null;
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 // Super Productivity CSV field mapping

@@ -18,7 +18,7 @@ const options: { key: SortKey; label: string }[] = [
 
 export default function SortControls({ sortKey, onSort }: Props) {
   return (
-    <div className="flex items-center gap-1 text-xs">
+    <div className="flex flex-wrap items-center gap-1 text-xs">
       <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
       {options.map(({ key, label }) => (
         <Button
