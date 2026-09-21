@@ -76,6 +76,14 @@
   }
 
   h1, h2, h3 { letter-spacing: 0; }
+
+  /* iOS Safari auto-zooms on focus when input font-size < 16px.
+     Force 16px on touch devices so focusing a text box doesn't zoom. */
+  @media (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px;
+    }
+  }
 }
 
 @layer components {
