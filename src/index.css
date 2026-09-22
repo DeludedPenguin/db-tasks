@@ -83,6 +83,11 @@
     input, textarea, select {
       font-size: 16px;
     }
+    /* Radix Select/Combobox triggers render as buttons, not <select> —
+       bump their text too so iOS doesn't auto-zoom on focus. */
+    button[role="combobox"] {
+      font-size: 16px;
+    }
   }
 }
 
