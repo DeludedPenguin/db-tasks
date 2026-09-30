@@ -58,15 +58,21 @@ export function localNow(now = new Date()) {
   };
 }
 
+// Sends via ntfy's JSON publish format (POST to the server root) so titles
+// can contain any characters — the plain `Title` header rejects non-ASCII.
 async function sendNtfy(title, body) {
   if (!config.url) return false;
-  const headers = { Title: title };
-  if (config.token) headers.Authorization = `Bearer ${config.token}`;
+  let topic;
   try {
-    const res = await fetch(config.url, {
+    const url = new URL(config.url);
+    topic = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "");
+    if (!topic) throw new Error("no topic in NTFY_URL path");
+    const headers = {};
+    if (config.token) headers.Authorization = `Bearer ${config.token}`;
+    const res = await fetch(url.origin, {
       method: "POST",
       headers,
-      body,
+      body: JSON.stringify({ topic, title, message: body, tags: ["spiral_calendar_pad"] }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
     if (!res.ok) {
