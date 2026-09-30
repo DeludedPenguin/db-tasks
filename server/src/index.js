@@ -1,6 +1,12 @@
 import express from "express";
 import cors from "cors";
 import { query, withTransaction, pool } from "./db.js";
+import {
+  startNotifyScheduler,
+  notifyConfigured,
+  notifyStatus,
+  sendTestNotification,
+} from "./notify.js";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -268,6 +274,20 @@ app.post("/api/backup", wrap(async (req, res) => {
   res.json({ ok: true, mode, counts });
 }));
 
+// ---- notifications (self-hosted ntfy) ------------------------------------
+
+app.get("/api/notify/status", wrap(async (_req, res) => {
+  res.json({ enabled: notifyConfigured(), ...notifyStatus() });
+}));
+
+app.post("/api/notify/test", wrap(async (_req, res) => {
+  if (!notifyConfigured()) {
+    return res.status(400).json({ error: "Notifications are not enabled (set NTFY_URL and NTFY_ENABLED=true)" });
+  }
+  const ok = await sendTestNotification();
+  res.json({ ok, lastError: notifyStatus().lastError });
+}));
+
 // ---- errors --------------------------------------------------------------
 
 app.use((err, _req, res, _next) => {
@@ -277,6 +297,8 @@ app.use((err, _req, res, _next) => {
 
 const port = Number(process.env.PORT || 4000);
 const server = app.listen(port, () => console.log(`DB_Tasks API listening on :${port}`));
+
+startNotifyScheduler();
 
 const shutdown = async () => {
   server.close();

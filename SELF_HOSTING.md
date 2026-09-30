@@ -68,6 +68,44 @@ to your API, and the login screen is skipped entirely. When it is unset the app 
 exactly as it does today on the hosted backend. All of that lives in `src/lib/data.ts` —
 one file, two backends.
 
+## 4. Notifications (ntfy)
+
+The API can send a daily digest of your tasks to your phone via
+[ntfy](https://ntfy.sh) — a free, open push-notification service. No accounts,
+no extra infrastructure: the API just POSTs to your topic.
+
+**One-time setup:**
+
+1. Install the **ntfy** app on your phone (App Store / Play Store).
+2. In the app, subscribe to a topic with an **unguessable name**, e.g.
+   `dbtasks-danplex-x7k2`. Public ntfy.sh topics are open to anyone who knows
+   the name, so pick something like a random suffix — that *is* your security.
+3. Add these to the API's environment and restart it:
+
+   | Variable           | Default   | Purpose                                            |
+   | ------------------ | --------- | -------------------------------------------------- |
+   | `NTFY_URL`         | —         | Your topic URL, e.g. `https://ntfy.sh/dbtasks-...` |
+   | `NTFY_ENABLED`     | `false`   | Set to `true` to turn notifications on             |
+   | `NTFY_TOKEN`       | —         | Only if your ntfy server requires authentication   |
+   | `NTFY_DIGEST_AT`   | `08:00`   | Local time for the morning digest                  |
+   | `NTFY_ESCALATE_AT` | —         | Optional afternoon nudge listing overdue tasks     |
+   | `NTFY_TZ_OFFSET`   | `+10:00`  | Your timezone offset from UTC (Melbourne default)  |
+
+**What you get:**
+
+- One **morning digest**: tasks due today, tasks scheduled to do today, and
+  overdue tasks flagged with how many days they've slipped. A quiet
+  "all clear" message when there's nothing on.
+- Optionally a short **afternoon nudge** (`NTFY_ESCALATE_AT=15:00`) repeating
+  just the overdue tasks.
+
+Check setup from a browser or curl: `GET /api/notify/status` shows whether
+notifications are enabled and the last send result; `POST /api/notify/test`
+sends a test notification to your phone.
+
+With docker compose, pass the variables through in your compose file's `api`
+service `environment:` block.
+
 ## Docker
 
 `server/Dockerfile` builds the API alone. `docker-compose.yml` brings up PostgreSQL plus
@@ -133,3 +171,5 @@ reverse proxy with its own auth before exposing it to the internet.
 | —      | `/api/focus-sessions`      | GET / POST / PATCH `:id` / DELETE `:id`  |
 | GET    | `/api/backup`              | Full JSON backup                         |
 | POST   | `/api/backup`              | Restore (`mode`: `merge` or `replace`)   |
+| GET    | `/api/notify/status`       | Notification settings + last send result |
+| POST   | `/api/notify/test`         | Send a test notification                 |
